@@ -1,0 +1,9 @@
+{
+  "datasets": [
+    {
+      "source": "huggingface",
+      "id": "ylecun/mnist",
+      "revision": null
+    }
+  ]
+}
