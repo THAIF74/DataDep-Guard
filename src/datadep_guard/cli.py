@@ -1,9 +1,41 @@
-import argparse
+﻿import argparse
 import json
 import sys
 from pathlib import Path
+from urllib.error import HTTPError, URLError
+from urllib.parse import quote, urlencode
+from urllib.request import Request, urlopen
 
 from datadep_guard import __version__
+
+
+def fetch_dataset_info(dataset_id: str, revision: str | None = None) -> dict:
+    """Fetch public Hugging Face dataset metadata."""
+    url = "https://huggingface.co/api/datasets/" + quote(dataset_id, safe="/")
+    if revision:
+        url += "?" + urlencode({"revision": revision})
+
+    request = Request(url, headers={"User-Agent": "DataDep-Guard/0.1.0"})
+
+    try:
+        with urlopen(request, timeout=10) as response:
+            info = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        raise RuntimeError(
+            f"Hugging Face returned HTTP {exc.code}; check the dataset ID "
+            "and revision, and whether access is required."
+        ) from exc
+    except URLError as exc:
+        raise RuntimeError(f"Network error contacting Hugging Face: {exc.reason}") from exc
+    except TimeoutError as exc:
+        raise RuntimeError("Hugging Face request timed out.") from exc
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("Hugging Face returned invalid JSON.") from exc
+
+    if not isinstance(info, dict) or not isinstance(info.get("sha"), str):
+        raise RuntimeError("Dataset response did not contain a commit SHA.")
+
+    return info
 
 
 def scan_config(path: Path) -> int:
@@ -36,26 +68,47 @@ def scan_config(path: Path) -> int:
         if revision is not None and (
             not isinstance(revision, str) or not revision.strip()
         ):
-            errors.append(f"Dataset {index + 1}: revision must be a non-empty string or null.")
+            errors.append(
+                f"Dataset {index + 1}: revision must be a non-empty string or null."
+            )
 
     if errors:
         for error in errors:
             print(f"ERROR: {error}", file=sys.stderr)
         return 2
 
-    print(f"DataDep Guard: {len(datasets)} dataset(s) found.")
+    print(f"DataDep Guard: checking {len(datasets)} dataset(s) on Hugging Face.")
+    failures = 0
 
     for dataset in datasets:
+        dataset_id = dataset["id"]
         revision = dataset.get("revision")
-        status = "PINNED" if revision else "UNPINNED"
-        print(f"[{status}] {dataset['id']}")
-        if revision:
-            print(f"         Revision: {revision}")
-        else:
-            print("         WARNING: No revision specified.")
 
-    print("Scan complete. No remote dataset changes were checked.")
-    return 0
+        try:
+            info = fetch_dataset_info(dataset_id, revision)
+        except Exception as exc:
+            print(f"[ERROR] {dataset_id}: {exc}")
+            failures += 1
+            continue
+
+        resolved_sha = info["sha"]
+
+        if revision:
+            print(f"[PINNED] {dataset_id}")
+            print(f"         Requested revision: {revision}")
+            print(f"         Resolved commit: {resolved_sha}")
+            print("         Revision exists on Hugging Face.")
+            print("         For reproducibility, prefer a full commit SHA.")
+        else:
+            print(f"[UNPINNED] {dataset_id}")
+            print(f"           Latest remote commit: {resolved_sha}")
+            print("           WARNING: Add this commit SHA to datadep.json to pin it.")
+
+    print(
+        f"Remote check complete: {len(datasets) - failures} successful, "
+        f"{failures} failed."
+    )
+    return 1 if failures else 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -67,13 +120,15 @@ def main(argv: list[str] | None = None) -> int:
 
     parser = argparse.ArgumentParser(
         prog="datadep-guard",
-        description="Inspect declared dataset dependencies."
+        description="Inspect dataset dependencies on Hugging Face.",
     )
     commands = parser.add_subparsers(dest="command")
-    scan_parser = commands.add_parser("scan", help="Validate dataset references")
+    scan_parser = commands.add_parser(
+        "scan", help="Validate configuration and check remote dataset revisions"
+    )
     scan_parser.add_argument(
         "config", nargs="?", default="datadep.json",
-        help="Configuration file (default: datadep.json)"
+        help="Configuration file (default: datadep.json)",
     )
 
     if not args:
