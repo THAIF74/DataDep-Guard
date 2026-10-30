@@ -38,6 +38,35 @@ def fetch_dataset_info(dataset_id: str, revision: str | None = None) -> dict:
     return info
 
 
+
+def load_config(path: Path):
+    try:
+        config = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"ERROR: Cannot read configuration: {exc}", file=sys.stderr)
+        return None
+    if not isinstance(config, dict) or not isinstance(config.get("datasets"), list):
+        print("ERROR: Configuration must contain a 'datasets' list.", file=sys.stderr)
+        return None
+    for index, dataset in enumerate(config["datasets"]):
+        if not isinstance(dataset, dict):
+            print(f"ERROR: Dataset {index + 1} must be an object.", file=sys.stderr)
+            return None
+        if dataset.get("source") != "huggingface":
+            print(f"ERROR: Dataset {index + 1}: invalid source.", file=sys.stderr)
+            return None
+        if not isinstance(dataset.get("id"), str) or not dataset["id"].strip():
+            print(f"ERROR: Dataset {index + 1}: missing dataset id.", file=sys.stderr)
+            return None
+        revision = dataset.get("revision")
+        if revision is not None and (
+            not isinstance(revision, str) or not revision.strip()
+        ):
+            print(f"ERROR: Dataset {index + 1}: invalid revision.", file=sys.stderr)
+            return None
+    return config
+
+
 def scan_config(path: Path) -> int:
     try:
         config = json.loads(path.read_text(encoding="utf-8"))
@@ -111,6 +140,40 @@ def scan_config(path: Path) -> int:
     return 1 if failures else 0
 
 
+
+def is_full_sha(value: str) -> bool:
+    import re
+    return bool(re.fullmatch(r"[0-9a-fA-F]{40}", value))
+def pin_config(path: Path) -> int:
+    config = load_config(path)
+    if config is None:
+        return 2
+    pending = []
+    for dataset in config["datasets"]:
+        if dataset.get("revision") is not None:
+            print(f"[ALREADY PINNED] {dataset['id']}")
+            continue
+        try:
+            info = fetch_dataset_info(dataset["id"])
+            sha = info["sha"]
+            if not is_full_sha(sha):
+                raise RuntimeError("Invalid commit SHA returned by Hugging Face.")
+            pending.append((dataset, sha))
+            print(f"[READY] {dataset['id']}: {sha}")
+        except Exception as exc:
+            print(f"[ERROR] {dataset['id']}: {exc}")
+            print("Pinning cancelled. Configuration was not changed.")
+            return 1
+    if not pending:
+        print("All datasets are already pinned. No changes made.")
+        return 0
+    for dataset, sha in pending:
+        dataset["revision"] = sha
+    path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+    print(f"Successfully pinned {len(pending)} dataset(s) in {path}.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
 
@@ -131,6 +194,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Configuration file (default: datadep.json)",
     )
 
+    pin_parser = commands.add_parser("pin", help="Pin unpinned datasets")
+    pin_parser.add_argument(
+        "config", nargs="?", default="datadep.json",
+        help="Configuration file (default: datadep.json)",
+    )
     if not args:
         parser.print_help()
         return 0
@@ -139,6 +207,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if parsed.command == "scan":
         return scan_config(Path(parsed.config))
+    if parsed.command == "pin":
+        return pin_config(Path(parsed.config))
 
     parser.print_help()
     return 0

@@ -1,4 +1,5 @@
 ﻿import json
+from datadep_guard import cli
 
 from datadep_guard.cli import main
 
@@ -93,3 +94,63 @@ def test_scan_rejects_invalid_json(tmp_path, monkeypatch, capsys):
 
     assert main(["scan"]) == 2
     assert "ERROR" in capsys.readouterr().err
+
+def test_pin_saves_sha(monkeypatch, tmp_path):
+    sha = "b" * 40
+    config = {
+        "datasets": [
+            {"source": "huggingface", "id": "ylecun/mnist", "revision": None}
+        ]
+    }
+    path = tmp_path / "datadep.json"
+    path.write_text(json.dumps(config))
+
+    monkeypatch.setattr(
+        cli,
+        "fetch_dataset_info",
+        lambda dataset_id, revision=None: {"sha": sha},
+    )
+
+    assert cli.pin_config(path) == 0
+    saved = json.loads(path.read_text())
+    assert saved["datasets"][0]["revision"] == sha
+
+
+def test_pin_failure_does_not_change_file(monkeypatch, tmp_path):
+    config = {
+        "datasets": [
+            {"source": "huggingface", "id": "ylecun/mnist", "revision": None}
+        ]
+    }
+    path = tmp_path / "datadep.json"
+    original = json.dumps(config)
+    path.write_text(original)
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("Remote unavailable")
+
+    monkeypatch.setattr(cli, "fetch_dataset_info", fail)
+
+    assert cli.pin_config(path) == 1
+    assert path.read_text() == original
+
+
+def test_pin_keeps_existing_revision(monkeypatch, tmp_path):
+    sha = "c" * 40
+    config = {
+        "datasets": [
+            {"source": "huggingface", "id": "ylecun/mnist", "revision": sha}
+        ]
+    }
+    path = tmp_path / "datadep.json"
+    path.write_text(json.dumps(config))
+
+    def should_not_run(*args, **kwargs):
+        raise AssertionError("Already pinned dataset should not be fetched.")
+
+    monkeypatch.setattr(cli, "fetch_dataset_info", should_not_run)
+
+    assert cli.pin_config(path) == 0
+    saved = json.loads(path.read_text())
+    assert saved["datasets"][0]["revision"] == sha
+
