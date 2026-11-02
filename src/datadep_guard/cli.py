@@ -7,6 +7,10 @@ from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
 from datadep_guard import __version__
+from datadep_guard.compare import (
+    compare_manifest_files,
+    print_comparison_report,
+)
 
 
 def fetch_dataset_info(dataset_id: str, revision: str | None = None) -> dict:
@@ -186,6 +190,12 @@ def main(argv: list[str] | None = None) -> int:
         description="Inspect dataset dependencies on Hugging Face.",
     )
     commands = parser.add_subparsers(dest="command")
+    compare_parser = commands.add_parser(
+        "compare",
+        help="Compare two dataset manifests"
+    )
+    compare_parser.add_argument("old_manifest")
+    compare_parser.add_argument("new_manifest")
     scan_parser = commands.add_parser(
         "scan", help="Validate configuration and check remote dataset revisions"
     )
@@ -209,6 +219,17 @@ def main(argv: list[str] | None = None) -> int:
         return scan_config(Path(parsed.config))
     if parsed.command == "pin":
         return pin_config(Path(parsed.config))
+    if parsed.command == "compare":
+        try:
+            result = compare_manifest_files(
+                Path(parsed.old_manifest),
+                Path(parsed.new_manifest),
+            )
+            print_comparison_report(result)
+            return 0
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            print(f"ERROR: Comparison failed: {exc}", file=sys.stderr)
+            return 2
 
     parser.print_help()
     return 0
