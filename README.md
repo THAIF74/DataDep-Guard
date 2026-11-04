@@ -38,7 +38,11 @@ Create a `datadep.json` file in the project directory:
       "id": "ylecun/mnist",
       "revision": null
     }
-  ]
+  ],
+  "policies": {
+    "fail_on_unpinned": true,
+    "fail_on_remote_error": true
+  }
 }
 ```
 
@@ -106,5 +110,5 @@ python -m pytest -v
 
 ## Project status
 
-The initial six development milestones are implemented: configuration scanning, Hugging Face revision checks, revision pinning, local snapshot manifests, and manifest comparison.
+The initial six development milestones and Day 7 policy/CI exit-code support are implemented. Run `python -m pytest -v` to verify the test suite.
 
