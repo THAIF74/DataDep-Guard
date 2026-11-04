@@ -46,16 +46,15 @@ The scanner and manifest comparison are implemented. Snapshot manifests describe
 local files; they do not independently prove that those files came from the
 declared remote revision.
 
-## Remaining planned scope
+## Day 7 — Policy configuration and CI exit codes
 
-The initial scope also mentions configurable warning policies and CI failure
-rules. These are **not confirmed as implemented in the current six milestones**.
-
-**Day 7 — Policy configuration and CI exit codes:** implemented optional scan
-policies for unpinned datasets and remote errors, plus
-`compare --fail-on-changes` for CI checks. Policy violations return exit code
-3; remote failures return 1 by default; invalid configuration returns 2.
+Implemented optional scan policies for unpinned datasets and remote errors,
+plus `compare --fail-on-changes` for CI checks. Policy violations return exit
+code 3; remote failures return 1 by default; invalid configuration returns 2.
 Automated tests cover policy behavior and exit codes.
+
+All seven planned development milestones are implemented in the repository.
+The final local test run is still required before marking Day 7 verified.
 
 ## Current limitations
 - The tool checks public Hugging Face dataset revisions; remote checks require network access.
