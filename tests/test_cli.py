@@ -154,3 +154,61 @@ def test_pin_keeps_existing_revision(monkeypatch, tmp_path):
     saved = json.loads(path.read_text())
     assert saved["datasets"][0]["revision"] == sha
 
+
+
+def test_scan_policy_fails_on_unpinned_dataset(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    write_config(tmp_path, {
+        "datasets": [
+            {"source": "huggingface", "id": "ylecun/mnist", "revision": None}
+        ],
+        "policies": {"fail_on_unpinned": True}
+    })
+    monkeypatch.setattr(
+        "datadep_guard.cli.fetch_dataset_info",
+        lambda dataset_id, revision=None: {"id": dataset_id, "sha": "a" * 40},
+    )
+    assert main(["scan"]) == 3
+    assert "POLICY VIOLATION" in capsys.readouterr().out
+
+
+def test_scan_policy_allows_unpinned_dataset_by_default(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    write_config(tmp_path, {
+        "datasets": [
+            {"source": "huggingface", "id": "ylecun/mnist", "revision": None}
+        ]
+    })
+    monkeypatch.setattr(
+        "datadep_guard.cli.fetch_dataset_info",
+        lambda dataset_id, revision=None: {"id": dataset_id, "sha": "a" * 40},
+    )
+    assert main(["scan"]) == 0
+    assert "WARNING" in capsys.readouterr().out
+
+
+def test_scan_rejects_invalid_policy_type(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    write_config(tmp_path, {
+        "datasets": [],
+        "policies": {"fail_on_unpinned": "yes"}
+    })
+    assert main(["scan"]) == 2
+    assert "must be true or false" in capsys.readouterr().err
+
+
+def test_compare_fail_on_changes_returns_policy_exit_code(tmp_path, capsys):
+    old_path = tmp_path / "old.json"
+    new_path = tmp_path / "new.json"
+    old_path.write_text(json.dumps({"files": [{"path": "a.txt", "sha256": "old"}]}))
+    new_path.write_text(json.dumps({"files": [{"path": "a.txt", "sha256": "new"}]}))
+    assert main(["compare", str(old_path), str(new_path), "--fail-on-changes"]) == 3
+    assert "POLICY VIOLATION" in capsys.readouterr().out
+
+
+def test_compare_without_policy_flag_returns_success_on_changes(tmp_path, capsys):
+    old_path = tmp_path / "old.json"
+    new_path = tmp_path / "new.json"
+    old_path.write_text(json.dumps({"files": [{"path": "a.txt", "sha256": "old"}]}))
+    new_path.write_text(json.dumps({"files": [{"path": "a.txt", "sha256": "new"}]}))
+    assert main(["compare", str(old_path), str(new_path)]) == 0
