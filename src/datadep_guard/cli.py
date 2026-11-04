@@ -83,6 +83,16 @@ def scan_config(path: Path) -> int:
         return 2
 
     datasets = config["datasets"]
+    policies = config.get("policies", {})
+    if not isinstance(policies, dict):
+        print("ERROR: 'policies' must be an object.", file=sys.stderr)
+        return 2
+    for key in ("fail_on_unpinned", "fail_on_remote_error"):
+        if key in policies and not isinstance(policies[key], bool):
+            print(f"ERROR: Policy '{key}' must be true or false.", file=sys.stderr)
+            return 2
+    fail_on_unpinned = policies.get("fail_on_unpinned", False)
+    fail_on_remote_error = policies.get("fail_on_remote_error", True)
     errors = []
 
     for index, dataset in enumerate(datasets):
@@ -112,6 +122,7 @@ def scan_config(path: Path) -> int:
 
     print(f"DataDep Guard: checking {len(datasets)} dataset(s) on Hugging Face.")
     failures = 0
+    unpinned = 0
 
     for dataset in datasets:
         dataset_id = dataset["id"]
@@ -133,6 +144,7 @@ def scan_config(path: Path) -> int:
             print("         Revision exists on Hugging Face.")
             print("         For reproducibility, prefer a full commit SHA.")
         else:
+            unpinned += 1
             print(f"[UNPINNED] {dataset_id}")
             print(f"           Latest remote commit: {resolved_sha}")
             print("           WARNING: Add this commit SHA to datadep.json to pin it.")
@@ -141,7 +153,17 @@ def scan_config(path: Path) -> int:
         f"Remote check complete: {len(datasets) - failures} successful, "
         f"{failures} failed."
     )
-    return 1 if failures else 0
+    if failures and fail_on_remote_error:
+        return 1
+    if unpinned and fail_on_unpinned:
+        print(
+            f"POLICY VIOLATION: {unpinned} unpinned dataset(s); "
+            "pin them or change policies.fail_on_unpinned."
+        )
+        return 3
+    if failures:
+        print("WARNING: Remote errors were allowed by policy.")
+    return 0
 
 
 
@@ -196,6 +218,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     compare_parser.add_argument("old_manifest")
     compare_parser.add_argument("new_manifest")
+    compare_parser.add_argument(
+        "--fail-on-changes",
+        action="store_true",
+        help="Return exit code 3 when the manifests contain changes (useful in CI)",
+    )
     scan_parser = commands.add_parser(
         "scan", help="Validate configuration and check remote dataset revisions"
     )
@@ -226,6 +253,9 @@ def main(argv: list[str] | None = None) -> int:
                 Path(parsed.new_manifest),
             )
             print_comparison_report(result)
+            if parsed.fail_on_changes and result["status"] == "CHANGES DETECTED":
+                print("POLICY VIOLATION: manifest changes detected.")
+                return 3
             return 0
         except (OSError, ValueError, KeyError, TypeError) as exc:
             print(f"ERROR: Comparison failed: {exc}", file=sys.stderr)
