@@ -51,9 +51,11 @@ declared remote revision.
 The initial scope also mentions configurable warning policies and CI failure
 rules. These are **not confirmed as implemented in the current six milestones**.
 
-A possible Day 7 is to add policy configuration and predictable CLI exit codes
-for policy violations, with tests for normal and failure cases. This should be
-treated as the next proposed milestone, not as completed work.
+**Day 7 — Policy configuration and CI exit codes:** implemented optional scan
+policies for unpinned datasets and remote errors, plus
+`compare --fail-on-changes` for CI checks. Policy violations return exit code
+3; remote failures return 1 by default; invalid configuration returns 2.
+Automated tests cover policy behavior and exit codes.
 
 ## Current limitations
 - The tool checks public Hugging Face dataset revisions; remote checks require network access.
