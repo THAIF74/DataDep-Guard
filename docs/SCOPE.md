@@ -33,7 +33,7 @@ to configurable policies.
 
 ## Implemented status
 
-The first six development milestones are implemented:
+All seven planned development milestones are implemented:
 
 1. **Day 1 — Project foundation:** package structure and initial scope.
 2. **Day 2 — Dataset dependency scanner:** validate the dataset configuration.
@@ -41,20 +41,17 @@ The first six development milestones are implemented:
 4. **Day 4 — Revision pinning:** resolve and save full commit SHA pins.
 5. **Day 5 — Snapshot manifests:** record local file paths, sizes, and SHA-256 checksums.
 6. **Day 6 — Dataset change detection:** compare manifests and report added, removed, modified, and unchanged files.
+7. **Day 7 — Policy configuration and CI exit codes:** enforce configurable scan policies and return predictable exit codes for CI use.
 
-The scanner and manifest comparison are implemented. Snapshot manifests describe
-local files; they do not independently prove that those files came from the
-declared remote revision.
+## Verification status
 
-## Day 7 — Policy configuration and CI exit codes
+The project owner reported a local test run on **November 4, 2026**:
+**25 tests passed in 0.76 seconds** using Python 3.11.9.
 
-Implemented optional scan policies for unpinned datasets and remote errors,
-plus `compare --fail-on-changes` for CI checks. Policy violations return exit
-code 3; remote failures return 1 by default; invalid configuration returns 2.
-Automated tests cover policy behavior and exit codes.
-
-All seven planned development milestones are implemented in the repository.
-The final local test run is still required before marking Day 7 verified.
+A GitHub Actions workflow is being added to run the test suite automatically
+on pushes and pull requests. The remote workflow result must be checked in
+the GitHub Actions tab; a local passing test run does not prove that remote
+CI has passed.
 
 ## Current limitations
 - The tool checks public Hugging Face dataset revisions; remote checks require network access.
