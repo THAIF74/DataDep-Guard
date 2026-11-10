@@ -18,11 +18,27 @@ A lightweight Python tool for checking Hugging Face dataset dependencies and det
 
 ## Installation
 
-Clone the repository, create and activate a virtual environment, then install the project:
+Clone the repository, create and activate a virtual environment, then install the project.
+
+**Windows PowerShell**
 
 ```powershell
+git clone https://github.com/THAIF74/DataDep-Guard.git
+cd DataDep-Guard
 py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+```
+
+**Linux / macOS**
+
+```bash
+git clone https://github.com/THAIF74/DataDep-Guard.git
+cd DataDep-Guard
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
 
@@ -52,26 +68,26 @@ Use a full 40-character commit SHA for a reproducible revision pin.
 
 Check the installed version:
 
-```powershell
+```bash
 datadep-guard --version
 ```
 
 Validate the configuration and check the remote dataset revision:
 
-```powershell
+```bash
 datadep-guard scan
 ```
 
 Pin datasets that do not yet have a revision:
 
-```powershell
+```bash
 datadep-guard pin
 ```
 
 Compare two previously generated manifest JSON files:
 
-```powershell
-datadep-guard compare snapshots\old-manifest.json snapshots\new-manifest.json
+```bash
+datadep-guard compare snapshots/old-manifest.json snapshots/new-manifest.json
 ```
 
 The comparison report identifies added, removed, modified, and unchanged file paths.
@@ -96,9 +112,16 @@ Replace the example revision with the actual commit SHA associated with the loca
 
 ## Run tests
 
-```powershell
+Install the development dependency and run the test suite:
+
+```bash
+python -m pip install -e ".[dev]"
 python -m pytest -v
 ```
+
+GitHub Actions runs the test suite automatically on pushes and pull requests
+using Python 3.11 and 3.12. Check the repository's **Actions** tab for the
+latest remote CI result.
 
 ## Current scope and limitations
 
@@ -110,5 +133,6 @@ python -m pytest -v
 
 ## Project status
 
-The initial six development milestones and Day 7 policy/CI exit-code support are implemented. Run `python -m pytest -v` to verify the test suite.
-
+The initial seven development milestones are implemented. The project owner
+reported that 25 tests passed locally on November 4, 2026. Remote CI status is
+shown in the GitHub Actions tab.
