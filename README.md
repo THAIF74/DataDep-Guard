@@ -84,6 +84,23 @@ Pin datasets that do not yet have a revision:
 datadep-guard pin
 ```
 
+Verify that a Hugging Face revision resolves correctly:
+
+```bash
+datadep-guard verify --dataset-id ylecun/mnist --revision YOUR_40_CHARACTER_COMMIT_SHA
+```
+
+For a full 40-character commit SHA, the command compares the requested SHA
+with the commit SHA returned by Hugging Face. It reports `[VERIFIED]` when
+they match and `[MISMATCH]` when they differ. Branches and tags are resolved
+to their current commit, but are not immutable pins.
+
+The command exits with:
+- `0`: revision verified
+- `1`: remote request failed or returned an invalid commit SHA
+- `2`: invalid or missing command arguments
+- `3`: requested full commit SHA does not match the resolved commit
+
 Create a manifest directly from a local dataset folder:
 
 ```powershell
