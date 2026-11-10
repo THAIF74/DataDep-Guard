@@ -201,6 +201,43 @@ def pin_config(path: Path) -> int:
     return 0
 
 
+
+def verify_dataset_revision(dataset_id: str, revision: str) -> int:
+    """Verify that a Hugging Face revision resolves to the expected commit."""
+    if not dataset_id.strip() or not revision.strip():
+        print("ERROR: Dataset ID and revision must not be empty.", file=sys.stderr)
+        return 2
+
+    try:
+        info = fetch_dataset_info(dataset_id, revision)
+    except Exception as exc:
+        print(f"[ERROR] {dataset_id}@{revision}: {exc}")
+        return 1
+
+    resolved_sha = info["sha"]
+    if not is_full_sha(resolved_sha):
+        print(
+            f"[ERROR] Hugging Face returned an invalid commit SHA for {dataset_id}."
+        )
+        return 1
+
+    if is_full_sha(revision):
+        if revision.lower() != resolved_sha.lower():
+            print(f"[MISMATCH] {dataset_id}")
+            print(f"           Requested SHA: {revision}")
+            print(f"           Resolved SHA:  {resolved_sha}")
+            return 3
+        print(f"[VERIFIED] {dataset_id}")
+        print(f"           Commit SHA: {resolved_sha}")
+        return 0
+
+    print(f"[VERIFIED] {dataset_id}")
+    print(f"           Requested revision: {revision}")
+    print(f"           Resolved commit: {resolved_sha}")
+    print("           Revision exists and resolves to this commit.")
+    return 0
+
+
 def create_manifest_command(dataset_id: str, revision: str, directory: Path, output: Path) -> int:
     """Create and save a SHA-256 manifest for a local dataset directory."""
     try:
@@ -247,6 +284,13 @@ def main(argv: list[str] | None = None) -> int:
         help="Configuration file (default: datadep.json)",
     )
 
+
+    verify_parser = commands.add_parser(
+        "verify", help="Verify a Hugging Face dataset revision against its resolved commit"
+    )
+    verify_parser.add_argument("--dataset-id", required=True, help="Hugging Face dataset ID")
+    verify_parser.add_argument("--revision", required=True, help="Branch, tag, or 40-character commit SHA")
+
     manifest_parser = commands.add_parser(
         "manifest", help="Create a SHA-256 manifest for a local dataset directory"
     )
@@ -270,6 +314,8 @@ def main(argv: list[str] | None = None) -> int:
         return scan_config(Path(parsed.config))
     if parsed.command == "pin":
         return pin_config(Path(parsed.config))
+    if parsed.command == "verify":
+        return verify_dataset_revision(parsed.dataset_id, parsed.revision)
     if parsed.command == "manifest":
         if not parsed.dataset_id.strip() or not parsed.revision.strip():
             parser.error("--dataset-id and --revision must not be empty")

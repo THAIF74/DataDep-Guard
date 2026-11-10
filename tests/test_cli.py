@@ -261,3 +261,55 @@ def test_manifest_cli_requires_arguments():
     with pytest.raises(SystemExit) as exc:
         main(["manifest"])
     assert exc.value.code == 2
+
+
+def test_verify_accepts_matching_full_commit_sha(monkeypatch, capsys):
+    sha = "a" * 40
+    monkeypatch.setattr(
+        cli,
+        "fetch_dataset_info",
+        lambda dataset_id, revision=None: {"sha": sha},
+    )
+    assert main(["verify", "--dataset-id", "ylecun/mnist", "--revision", sha]) == 0
+    assert "[VERIFIED] ylecun/mnist" in capsys.readouterr().out
+
+
+def test_verify_detects_full_commit_sha_mismatch(monkeypatch, capsys):
+    requested = "a" * 40
+    resolved = "b" * 40
+    monkeypatch.setattr(
+        cli,
+        "fetch_dataset_info",
+        lambda dataset_id, revision=None: {"sha": resolved},
+    )
+    assert main(["verify", "--dataset-id", "ylecun/mnist", "--revision", requested]) == 3
+    output = capsys.readouterr().out
+    assert "[MISMATCH] ylecun/mnist" in output
+    assert requested in output
+    assert resolved in output
+
+
+def test_verify_resolves_branch_or_tag(monkeypatch, capsys):
+    resolved = "c" * 40
+    monkeypatch.setattr(
+        cli,
+        "fetch_dataset_info",
+        lambda dataset_id, revision=None: {"sha": resolved},
+    )
+    assert main(["verify", "--dataset-id", "ylecun/mnist", "--revision", "main"]) == 0
+    output = capsys.readouterr().out
+    assert "[VERIFIED] ylecun/mnist" in output
+    assert "Resolved commit:" in output
+
+
+def test_verify_returns_error_for_remote_failure(monkeypatch, capsys):
+    def fail(dataset_id, revision=None):
+        raise RuntimeError("Remote unavailable")
+    monkeypatch.setattr(cli, "fetch_dataset_info", fail)
+    assert main(["verify", "--dataset-id", "ylecun/mnist", "--revision", "main"]) == 1
+    assert "[ERROR] ylecun/mnist@main" in capsys.readouterr().out
+
+
+def test_verify_rejects_empty_values(capsys):
+    assert main(["verify", "--dataset-id", "", "--revision", "main"]) == 2
+    assert "must not be empty" in capsys.readouterr().err
