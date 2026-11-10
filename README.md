@@ -7,7 +7,7 @@ A lightweight Python tool for checking Hugging Face dataset dependencies and det
 - Validate a `datadep.json` dataset dependency configuration.
 - Check public Hugging Face dataset revisions.
 - Pin unpinned dataset references to full commit SHAs.
-- Generate local file manifests with file sizes and SHA-256 checksums.
+- Generate local file manifests with file sizes and SHA-256 checksums using the Python API or CLI.
 - Compare two manifests and report added, removed, modified, and unchanged files.
 
 ## Requirements
@@ -83,6 +83,20 @@ Pin datasets that do not yet have a revision:
 ```bash
 datadep-guard pin
 ```
+
+Create a manifest directly from a local dataset folder:
+
+```powershell
+datadep-guard manifest `
+  --dataset-id ylecun/mnist `
+  --revision YOUR_40_CHARACTER_COMMIT_SHA `
+  --directory .\data\mnist `
+  --output .\snapshots\mnist-manifest.json
+```
+
+The command records each included file's relative path, size, and SHA-256 checksum.
+It reads the local folder only; it does not download or upload dataset files.
+Keep the output manifest outside the dataset folder.
 
 Compare two previously generated manifest JSON files:
 
