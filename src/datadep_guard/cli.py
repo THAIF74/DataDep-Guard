@@ -11,6 +11,7 @@ from datadep_guard.compare import (
     compare_manifest_files,
     print_comparison_report,
 )
+from datadep_guard.manifest import create_manifest, save_manifest
 
 
 def fetch_dataset_info(dataset_id: str, revision: str | None = None) -> dict:
@@ -200,6 +201,21 @@ def pin_config(path: Path) -> int:
     return 0
 
 
+def create_manifest_command(dataset_id: str, revision: str, directory: Path, output: Path) -> int:
+    """Create and save a SHA-256 manifest for a local dataset directory."""
+    try:
+        manifest = create_manifest(dataset_id, revision, directory)
+        save_manifest(manifest, output)
+    except (OSError, ValueError) as exc:
+        print(f"ERROR: Manifest creation failed: {exc}", file=sys.stderr)
+        return 2
+
+    print(f"Created manifest for {dataset_id} ({manifest['file_count']} files).")
+    print(f"Revision: {revision}")
+    print(f"Output: {output}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
 
@@ -231,6 +247,14 @@ def main(argv: list[str] | None = None) -> int:
         help="Configuration file (default: datadep.json)",
     )
 
+    manifest_parser = commands.add_parser(
+        "manifest", help="Create a SHA-256 manifest for a local dataset directory"
+    )
+    manifest_parser.add_argument("--dataset-id", required=True, help="Dataset identifier")
+    manifest_parser.add_argument("--revision", required=True, help="Dataset commit or revision")
+    manifest_parser.add_argument("--directory", required=True, help="Local dataset directory")
+    manifest_parser.add_argument("--output", required=True, help="Path for the output JSON manifest")
+
     pin_parser = commands.add_parser("pin", help="Pin unpinned datasets")
     pin_parser.add_argument(
         "config", nargs="?", default="datadep.json",
@@ -246,6 +270,15 @@ def main(argv: list[str] | None = None) -> int:
         return scan_config(Path(parsed.config))
     if parsed.command == "pin":
         return pin_config(Path(parsed.config))
+    if parsed.command == "manifest":
+        if not parsed.dataset_id.strip() or not parsed.revision.strip():
+            parser.error("--dataset-id and --revision must not be empty")
+        return create_manifest_command(
+            parsed.dataset_id,
+            parsed.revision,
+            Path(parsed.directory),
+            Path(parsed.output),
+        )
     if parsed.command == "compare":
         try:
             result = compare_manifest_files(
