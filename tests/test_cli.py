@@ -212,3 +212,52 @@ def test_compare_without_policy_flag_returns_success_on_changes(tmp_path, capsys
     old_path.write_text(json.dumps({"files": [{"path": "a.txt", "sha256": "old"}]}))
     new_path.write_text(json.dumps({"files": [{"path": "a.txt", "sha256": "new"}]}))
     assert main(["compare", str(old_path), str(new_path)]) == 0
+
+
+
+def test_manifest_cli_creates_json_manifest(tmp_path, capsys):
+    from datadep_guard.cli import main
+
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "sample.txt").write_text("dataset contents", encoding="utf-8")
+    output = tmp_path / "snapshots" / "manifest.json"
+
+    assert main([
+        "manifest",
+        "--dataset-id", "example/dataset",
+        "--revision", "a" * 40,
+        "--directory", str(data_dir),
+        "--output", str(output),
+    ]) == 0
+
+    saved = json.loads(output.read_text(encoding="utf-8"))
+    assert saved["dataset"] == "example/dataset"
+    assert saved["revision"] == "a" * 40
+    assert saved["file_count"] == 1
+    assert saved["files"][0]["path"] == "sample.txt"
+    assert "Created manifest" in capsys.readouterr().out
+
+
+def test_manifest_cli_rejects_missing_directory(tmp_path, capsys):
+    from datadep_guard.cli import main
+
+    result = main([
+        "manifest",
+        "--dataset-id", "example/dataset",
+        "--revision", "a" * 40,
+        "--directory", str(tmp_path / "missing"),
+        "--output", str(tmp_path / "manifest.json"),
+    ])
+
+    assert result == 2
+    assert "does not exist" in capsys.readouterr().err
+
+
+def test_manifest_cli_requires_arguments():
+    from datadep_guard.cli import main
+    import pytest
+
+    with pytest.raises(SystemExit) as exc:
+        main(["manifest"])
+    assert exc.value.code == 2
