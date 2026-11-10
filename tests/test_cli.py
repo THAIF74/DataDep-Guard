@@ -310,8 +310,6 @@ def test_verify_returns_error_for_remote_failure(monkeypatch, capsys):
     assert "[ERROR] ylecun/mnist@main" in capsys.readouterr().out
 
 
-def test_verify_rejects_empty_values():
-    import pytest
-    with pytest.raises(SystemExit) as exc:
-        main(["verify", "--dataset-id", "", "--revision", "main"])
-    assert exc.value.code == 2
+def test_verify_rejects_empty_values(capsys):
+    assert main(["verify", "--dataset-id", "", "--revision", "main"]) == 2
+    assert "must not be empty" in capsys.readouterr().err
